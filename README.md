@@ -55,11 +55,17 @@ Default values are used everywhere, but you can tweak them as much as you
 want. For example:
 
 ```
-python3 server.py --port 5555 --certificate-path /home/user/file.crt --password 123456789
-python3 client.py --server asi.ericroy.net --port 5555 --password 123456789 --public-key-path /home/user/file.pub
+python3 server.py --port 5555 --private-key-path /home/user/key.pem --password 123456789
+python3 client.py --host asi.ericroy.net --port 5555 --password 123456789 --public-key-path /home/user/cert.pem
 ```
 
-<!-- REQUIREMENTS
+You can see the full list using `-h` or `--help`:
+```
+python3 server.py -h
+python3 client.py --help
+```
+
+<!-- PROJECT REQUIREMENTS
 SSL/TLS Encryption:
     Use Python’s ssl module to wrap the sockets.
     Generate or manage self-signed certificates.
@@ -68,8 +74,7 @@ SSL/TLS Encryption:
 Authentication Mechanism:
     Implement a method (e.g., password-based, challenge-response, or public/private key pairs) to validate connecting clients.
     Integrate the authentication process immediately after the SSL/TLS handshake and before any shell commands are executed.
--->
-<!--
+
 You must share the GitHub link to your project, ensuring that the code is fully commented and includes a complete README section.
 In addition, you should provide a link to a demo video where you explain, step by step, the scenario, the problem, your code, and the final execution.
 If you are working in a team, each team member must explain a specific part of the project in the video.
