@@ -28,16 +28,28 @@ Only one client can be connected at a time.
 
 **Requirements:** modern version of Python 3. Only builtin modules are used.
 
-On your server (a machine which the victim/client can connect to) run:
+### Server-side
+
+On your server (a machine which the victim/client can connect to) you need to
+create a self-signed certificate:
+```
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes
+```
+
+Then you can run the server:
 ```
 python3 server.py
 ```
 
-On the victim machine, copy *only* the `client.py` file (since copying
-the rest would lead to the client knowing server keys). Run:
+### Client-side
+
+On the client machine, copy *only* the `client.py` file and `cert.pem` (since
+copying the rest would lead to the client knowing server keys). Run:
 ```
 python3 client.py
 ```
+
+### Parameterize
 
 Default values are used everywhere, but you can tweak them as much as you
 want. For example:

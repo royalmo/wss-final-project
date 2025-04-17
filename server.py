@@ -1,4 +1,5 @@
 import socket
+import ssl
 import sys
 
 class SocketServer:
@@ -9,10 +10,14 @@ class SocketServer:
     def __init__(self, host="", port=9999):
         """
         Initialize the server with a host and port.
+        Initializes the TLS context
         """
         self.host = host
         self.port = port
         self.socket = None
+
+        self.tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        self.tls_context.load_cert_chain(certfile="cert.pem", keyfile="key.pem") 
 
     def create_socket(self):
         """
@@ -45,7 +50,22 @@ class SocketServer:
         try:
             conn, address = self.socket.accept()
             print(f"Connection established with IP: {address[0]} on Port: {address[1]}")
-            self.send_commands(conn)
+            # Use TLS context from before
+            conn = self.tls_context.wrap_socket(conn, server_side=True)
+            print("TLS Handshake completed.")
+            # Client auth
+            self.check_client_password(conn)
+
+            # Handle Ctrl+C, Ctrl+D
+            try:
+                self.send_commands(conn)
+            except KeyboardInterrupt:
+                print("Exiting.")
+                self.socket.close()
+            except EOFError:
+                print("Exiting.")
+                self.socket.close()
+
             conn.close()
         except socket.error as error:
             print(f"Error accepting connection: {error}")
@@ -57,7 +77,7 @@ class SocketServer:
         """
         while True:
             command = input("Enter command: ")
-            if command.lower() == "quit":
+            if command.lower() in ["quit", "exit"]:
                 print("Closing connection and shutting down server.")
                 conn.close()
                 self.socket.close()
@@ -72,11 +92,32 @@ class SocketServer:
                     conn.close()
                     break
 
+    def check_client_password(self, conn):
+        """
+        After the TLS handshake, the first thing the client needs to do is to
+        send the PSK. If incorrect, connection is closed.
+        """
+        psk = conn.recv(1024).decode()
+        if psk != "supersecret":
+            conn.close()
+            self.socket.close()
+            raise Exception("Invalid PSK. Is the client the real one? Exiting.")
+        print("Client authenticated correctly using PSK.")
+
 def main():
     server = SocketServer()
     server.create_socket()
     server.bind_socket()
-    server.accept_connection()
+
+    # Handle Ctrl+C, Ctrl+D
+    try:
+        server.accept_connection()
+    except KeyboardInterrupt:
+        print("Exiting.")
+        server.socket.close()
+    except EOFError:
+        print("Exiting.")
+        server.socket.close()
 
 if __name__ == "__main__":
     main()
