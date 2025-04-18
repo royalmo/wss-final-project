@@ -9,6 +9,8 @@ import socket
 import ssl
 import sys
 import argparse
+import logging
+import logger
 
 # Change here the default values
 parser = argparse.ArgumentParser()
@@ -21,6 +23,8 @@ parser.add_argument('--private-key-path', type=str,
 parser.add_argument('--public-key-path', type=str,
                     help='Server\'s certificate path', default="cert.pem")
 args = parser.parse_args()
+
+logger.setup_logging()
 
 
 class SocketServer:
@@ -52,7 +56,7 @@ class SocketServer:
             self.create_socket()
             self.bind_socket()
         except Exception as error:
-            print(f"Socket creation or binding error: {error}")
+            logging.error(f"Socket creation or binding error: {error}")
             sys.exit(1)
         return self
 
@@ -67,18 +71,18 @@ class SocketServer:
         """
         Create the socket for the server.
         """
-        print("Creating socket...")
+        logging.debug("Creating socket...")
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        print("Socket created successfully.")
+        logging.info("Socket created successfully.")
 
     def bind_socket(self) -> None:
         """
         Bind the socket to the host and port, and start listening for connections.
         """
-        print(f"Binding to port {self.port}...")
+        logging.debug(f"Binding to port {self.port}...")
         self.socket.bind((self.host, self.port))
         self.socket.listen(5)
-        print("Socket bound successfully.")
+        logging.info("Socket bound successfully.")
 
     def accept_connection(self) -> None:
         """
@@ -92,23 +96,25 @@ class SocketServer:
             except socket.timeout:
                 pass
 
-        print(f"Connection with {address[0]}:{address[1]} established.")
+        logging.info(f"Connection with {address[0]}:{address[1]} established.")
 
         try:
             # Wrap the socket with TLS
             with self.tls_context.wrap_socket(client, server_side=True) as client:
-                print("TLS Handshake completed.")
+                logging.info("TLS Handshake completed.")
 
                 # Authenticate the client using a pre-shared key (PSK)
-                print("Waiting for PSK from client...")
+                logging.debug("Waiting for PSK from client...")
                 if not self.client_authenticated(client):
-                    print("Invalid PSK. Client could not be authenticated.")
+                    logging.error(
+                        "Invalid PSK. Client could not be authenticated.")
                     return
-                print("Valid PSK received. Client authenticated.")
+                logging.info("Valid PSK received. Client authenticated.")
 
                 self.send_commands(client)
         finally:
-            print(f"\nConnection with {address[0]}:{address[1]} closed.")
+            logging.warning(
+                f"Connection with {address[0]}:{address[1]} closed.")
             self.socket.settimeout(None)
 
     def send_commands(self, conn: ssl.SSLSocket):
@@ -117,13 +123,13 @@ class SocketServer:
         until the session is closed by any side.
         Type 'quit' or 'exit' to end the current session.
         """
-        print("You can now send commands to the client.")
-        print("Type 'quit' or 'exit' to end the current session.")
+        logging.info("You can now send commands to the client.")
+        logging.info("Type 'quit' or 'exit' to end the current session.")
         while True:
             try:
                 command = None
                 while not command:
-                    command = input("Enter command: ")
+                    command = input("[>] ")
 
                 if command.lower() in ["quit", "exit"]:
                     break
@@ -132,9 +138,9 @@ class SocketServer:
                 conn.send(command.encode())
                 client_response = conn.recv(1024).decode('utf-8')
                 if not client_response:
-                    print("Client disconnected.")
+                    logging.warning("Client disconnected.")
                     break
-                print(client_response, end="")
+                print(client_response)
             except socket.timeout:
                 pass
 
@@ -148,15 +154,15 @@ class SocketServer:
 
 def main():
     with SocketServer() as server:
-        print("Server started.")
-        print("You can stop the server whenever with Ctrl+C or Ctrl+D.")
+        logging.info("Server started.")
+        logging.info("You can stop the server whenever with Ctrl+C or Ctrl+D.")
         while True:
-            print("Waiting for incoming connections...")
+            logging.info("Waiting for incoming connections...")
             try:
                 server.accept_connection()
             # Handle Ctrl+C, Ctrl+D
             except KeyboardInterrupt:
-                print("Exiting.")
+                logging.warning("Exiting.")
                 break
             except:
                 pass

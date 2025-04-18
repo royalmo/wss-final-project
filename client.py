@@ -11,6 +11,10 @@ import subprocess
 import ssl
 import sys
 import argparse
+import logging
+import logger
+
+logger.setup_logging()
 
 # Change here the default values
 parser = argparse.ArgumentParser()
@@ -24,23 +28,25 @@ parser.add_argument('--public-key-path', type=str,
                     help='Server\'s certificate path', default="cert.pem")
 args = parser.parse_args()
 
+logger.setup_logging()
+
 
 def connect_to_server() -> ssl.SSLSocket:
     try:
         # Create a TLS socket and connect to the server
-        print("Creating socket...")
+        logging.debug("Creating socket...")
         s = create_tls_socket()
-        print("Socket created successfully.")
-        print("Connecting to the server...")
+        logging.info("Socket created successfully.")
+        logging.debug("Connecting to the server...")
         s.connect((args.host, args.port))
-        print("Connected to the server successfully.")
+        logging.info("Connected to the server successfully.")
         # Send PSK to authenticate themselves to the server
-        print("Sending PSK to the server...")
+        logging.debug("Sending PSK to the server...")
         s.send(args.password.encode())
-        print("Client authenticated.")
+        logging.info("Client authenticated.")
         return s
     except Exception as e:
-        print(f"Connection failed: {e}")
+        logging.error(f"Connection failed: {e}")
         sys.exit(1)
 
 
@@ -133,15 +139,15 @@ def main():
     Main function to connect to the server and handle commands.
     """
     with connect_to_server() as s:
-        print("Client started.")
-        print("You can stop the client whenever with Ctrl+C or Ctrl+D.")
+        logging.info("Client started.")
+        logging.info("You can stop the client whenever with Ctrl+C or Ctrl+D.")
         try:
             handle_commands(s)
         # Handle Ctrl+C, Ctrl+D
         except:
             pass
         finally:
-            print("Exiting.")
+            logging.warning("Exiting.")
 
 
 if __name__ == '__main__':
