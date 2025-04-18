@@ -5,18 +5,23 @@ import argparse
 
 # Change here the default values
 parser = argparse.ArgumentParser()
-parser.add_argument('--port', type=int, help='Port to connect to', default=9999)
-parser.add_argument('--password', type=str, help='Pre-shared key', default="123456789")
-parser.add_argument('--private-key-path', type=str, help='Server\'s key path', default="key.pem")
-parser.add_argument('--public-key-path', type=str, help='Server\'s certificate path', default="cert.pem")
-
+parser.add_argument('--port', type=int,
+                    help='Port to connect to', default=9999)
+parser.add_argument('--password', type=str,
+                    help='Pre-shared key', default="123456789")
+parser.add_argument('--private-key-path', type=str,
+                    help='Server\'s key path', default="key.pem")
+parser.add_argument('--public-key-path', type=str,
+                    help='Server\'s certificate path', default="cert.pem")
 args = parser.parse_args()
+
 
 class SocketServer:
     """
     A simple socket server that binds to a specified host and port,
     accepts one connection, and sends commands to the connected client.
     """
+
     def __init__(self, host="0.0.0.0", port=args.port):
         """
         Initialize the server with a host and port.
@@ -27,7 +32,8 @@ class SocketServer:
         self.socket = None
 
         self.tls_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        self.tls_context.load_cert_chain(certfile=args.public_key_path, keyfile=args.private_key_path) 
+        self.tls_context.load_cert_chain(
+            certfile=args.public_key_path, keyfile=args.private_key_path)
 
     def create_socket(self):
         """
@@ -59,7 +65,8 @@ class SocketServer:
         """
         try:
             conn, address = self.socket.accept()
-            print(f"Connection established with IP: {address[0]} on Port: {address[1]}")
+            print(
+                f"Connection established with IP: {address[0]} on Port: {address[1]}")
             # Use TLS context from before
             conn = self.tls_context.wrap_socket(conn, server_side=True)
             print("TLS Handshake completed.")
@@ -111,8 +118,10 @@ class SocketServer:
         if psk != args.password:
             conn.close()
             self.socket.close()
-            raise Exception("Invalid PSK. Is the client the real one? Exiting.")
+            raise Exception(
+                "Invalid PSK. Is the client the real one? Exiting.")
         print("Client authenticated correctly using PSK.")
+
 
 def main():
     server = SocketServer()
@@ -128,6 +137,7 @@ def main():
     except EOFError:
         print("Exiting.")
         server.socket.close()
+
 
 if __name__ == "__main__":
     main()

